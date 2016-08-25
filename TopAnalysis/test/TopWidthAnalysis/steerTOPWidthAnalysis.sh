@@ -17,25 +17,17 @@ if [ "$#" -ne 2 ]; then
 fi
 
 queue=2nd
-outdir=/afs/cern.ch/work/e/ecoleman/public/TopWidth/TopWidth_${ERA}/
+outdir=/afs/cern.ch/work/e/ecoleman/public/TopWidth/TopWidth_${ERA}_old/
 cardsdir=${outdir}/datacards
 wwwdir=~/www/TopWidth_${ERA}/
 CMSSW_7_4_7dir=~/CMSSW_7_4_7/src/
-CMSSW_7_6_3dir=~/CMSSW_8_0_8_patch1_2/src/
+CMSSW_7_6_3dir=~/CMSSW_8_0_11/src/
 
-
-lumi=11377
-case $ERA in
-    era2015)
-        lumi=2267.84
-    ;;
-esac
-
-unblind=false
+unblind=true
 nPseudo=1000
 
 lfs=(EE EM MM)
-wid=(0p5w 1p0w 1p5w 2p0w 2p5w 3p0w 3p5w 4p0w 4p5w 5p0w)
+wid=(0p2w 0p4w 0p6w 0p8w 1p0w 1p2w 1p4w 1p6w 1p8w 2p0w 2p2w 2p4w 2p6w 2p8w 3p0w 3p5w 4p0w)
 #dists=(mdrmlb minmlb incmlb sncmlb mt2mlb)
 dists=(incmlb sncmlb mt2mlb)
 cat=(1b 2b)
@@ -186,15 +178,6 @@ case $WHAT in
                 # for a given width, lfs, and lbcat, merge all
                 lfscmd="python ${CMSSW_BASE}/src/HiggsAnalysis/CombinedLimit/scripts/combineCards.py "
                 for tCat in ${cat[*]} ; do
-                    # TODO: Address this tWttinterf "bad bin" for era2015 
-                    #if [[ "${tlbCat}${tlfs}${tCat}" == "lowptMM1b" ]]; then
-                    #    echo "Skipping lowptMM1b"
-                    #    continue
-                    #fi
-                    #if [[ "${tlbCat}${tlfs}${tCat}" == "highptEM1b" ]]; then
-                    #    echo "Skipping lowptMM1b"
-                    #    continue
-                    #fi
                     cardname="${tlbCat}${tlfs}${tCat}=${cardsdir}"
                     cardname="${cardname}/datacard__${twid}_${tlbCat}${tlfs}${tCat}_${dist}.dat"
                     allcmd="${allcmd} ${cardname} "
@@ -240,15 +223,15 @@ case $WHAT in
         for dist in ${dists[*]} ; do
         for twid in ${wid[*]} ; do
 
-            if [[ "${twid}" == "1p0w" ]] ; then
-                continue
-            fi
-
             # All datacards
             cmd="combine ${outdir}/${twid}_${dist}.root -M MultiDimFit" 
             cmd="${cmd} -m 172.5 -P x --floatOtherPOI=1 --algo=grid --points=200"
-            cmd="${cmd} -t -1 --expectSignal=1 --setPhysicsModelParameters x=0,r=1"
+            cmd="${cmd} --expectSignal=1 --setPhysicsModelParameters x=0,r=1"
             cmd="${cmd} -n x0_scan_Asimov_${twid}_${dist}"
+            if [[ ${unblind} == false ]] ; then 
+                echo "Analysis is blinded"
+                cmd="${cmd} -t -1"
+            fi
             
             bsub -q ${queue} \
                 ${CMSSW_7_6_3dir}/TopLJets2015/TopAnalysis/test/TopWidthAnalysis/wrapPseudoexperiments.sh \
@@ -262,10 +245,6 @@ case $WHAT in
         cd ${outdir}
         for dist in ${dists[*]} ; do
         for twid in ${wid[*]} ; do
-
-            if [[ "${twid}" == "1p0w" ]] ; then
-                continue
-            fi
 
             # All datacards
             echo "Making CLs for ${twid} ${dist}"
@@ -285,10 +264,6 @@ case $WHAT in
         cd ${outdir}
         for dist in ${dists[*]} ; do
         for twid in ${wid[*]} ; do
-
-            if [[ "${twid}" == "1p0w" ]] ; then
-                continue
-            fi
             
             rootcmds="${CMSSW_7_6_3dir}/TopLJets2015/TopAnalysis/test/TopWidthAnalysis"
             rootcmds="${rootcmds}/hypoTestResultTreeTopWid.cxx(\"x_pre-fit_exp__${twid}_${dist}.qvals.root"
@@ -303,6 +278,8 @@ case $WHAT in
     QUANTILES ) # plot quantiles distributions of all toys, get CLsPlot
         cd ${outdir}
         for dist in ${dists[*]} ; do
+
+        # TODO Add unblind command
 
             # All datacards
             python ${CMSSW_7_6_3dir}/TopLJets2015/TopAnalysis/test/TopWidthAnalysis/getQuantilesPlot.py \
@@ -341,21 +318,18 @@ case $WHAT in
             # run likelihood scan
             cmd="echo 'Starting job ${dist} ${syst}'"
             for twid in ${wid[*]}; do
-                if [[ "${twid}" == "1p0w" ]] ; then
-                    continue
-                fi
                 cmd="${cmd}; combine ${outdir}/${twid}_${dist}.root -M MultiDimFit" 
                 cmd="${cmd} -m 172.5 -P x --floatOtherPOI=1 --algo=grid --points=200"
-                cmd="${cmd} -t -1 --expectSignal=1 --setPhysicsModelParameters x=0,r=1"
+                cmd="${cmd} --expectSignal=1 --setPhysicsModelParameters x=0,r=1"
                 cmd="${cmd} -n x0_scan_Asimov_${twid}_${dist}"
                 cmd="${cmd} --freezeNuisances ${systList}"
+                if [[ ${unblind} == false ]] ; then
+                  cmd="${cmd} -t -1"   
+                fi
             done
 
             # run CLs
             for twid in ${wid[*]}; do
-                if [[ "${twid}" == "1p0w" ]] ; then
-                    continue
-                fi
                 cmd="${cmd}; combine ${outdir}/${twid}_${dist}.root -M HybridNew --seed 8192 --saveHybridResult" 
                 cmd="${cmd} -m 172.5  --testStat=TEV --singlePoint 1 -T ${nPseudo} -i 2 --fork 6"
                 cmd="${cmd} --clsAcc 0 --fullBToys  --generateExt=1 --generateNuis=0"
@@ -365,9 +339,6 @@ case $WHAT in
 
             # run toy macro 
             for twid in ${wid[*]}; do
-                if [[ "${twid}" == "1p0w" ]] ; then
-                    continue
-                fi
                 rootcmds="${CMSSW_7_6_3dir}/TopLJets2015/TopAnalysis/test/TopWidthAnalysis"
                 rootcmds="${rootcmds}/hypoTestResultTreeTopWid.cxx(\"x_pre-fit_exp_${twid}_${dist}.qvals.root"
                 rootcmds="${rootcmds}\",172.5,1,\"x\",1000,\"\",\"${twid}\",\"${dist}\",${unblind})"

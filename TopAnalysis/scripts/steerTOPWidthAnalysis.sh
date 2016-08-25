@@ -37,8 +37,8 @@ case $ERA in
 	;;
 esac
 
-outdir=~/work/TopWidth_${ERA}
-wwwdir=~/www/TopWidth_${ERA}
+outdir=/afs/cern.ch/work/e/ecoleman/public/TopWidth/TopWidth_${ERA}_widthx4
+wwwdir=~/www/TopWidth_${ERA}_widthx4
 
 
 RED='\e[31m'
@@ -59,8 +59,7 @@ case $WHAT in
 	cp test/index.php ${wwwdir}/sel
 	;;
     ANA )
-	queue=local
-	python scripts/runTopWidthAnalysis.py -i ${summaryeosdir} -o ${outdir}/analysis -q ${queue} --only TTJ;
+	python scripts/runTopWidthAnalysis.py -i ${summaryeosdir} -o ${outdir}/analysis -q ${queue};
 	;;
     MERGE )
 	./scripts/mergeOutputs.py ${outdir}/analysis;

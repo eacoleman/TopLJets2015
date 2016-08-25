@@ -163,7 +163,9 @@ def runTopWidthAnalysis(fileName,
             tmassList.append( tops[tid].M() )
         widthWeight={}
         for w in widthList:
-            widthWeight[w]=weightTopWidth(tmassList,bwigner,w*smWidth,smWidth)
+            # eac edit
+            widthCorrFactor= 1 if (isData or "MC13TeV_TTJets_dilpowheg" not in filename) else 4
+            widthWeight[w]=weightTopWidth(tmassList,bwigner,w/widthCorrFactor*smWidth,smWidth)
 
             #paranoid check
             var='tmass_%3.1fw'%w
